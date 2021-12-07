@@ -1,0 +1,11 @@
+import cv2 as cv
+
+DEFAULT_CV2_METHOD = cv.TM_CCOEFF_NORMED
+DEFAULT_CV2_BORDERCOLOR = (255, 0, 176)
+
+PLAYER_STATUS = {
+    "PLAYER_STATUS_IDLE": "idle",
+    "PLAYER_STATUS_MOVING": "moving",
+    "PLAYER_STATUS_FISHING": "fishing",
+    "PLAYER_STATUS_SELLING": "selling",
+}
