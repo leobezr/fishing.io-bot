@@ -13,9 +13,6 @@ STORE_SELECT_ALL = cv.imread(r"./src/objects/select_all.jpg")
 STORE_SELL = cv.imread(r"./src/objects/sell_for.jpg")
 STORE_SELL_CONFIRM = cv.imread(r"./src/objects/sell_confirm.jpg")
 
-POS_CONFIRM_SEL_X = 1150
-POS_CONFIRM_SEL_Y = 780
-
 POS_LEAVE_STORE_X = 150
 POS_LEAVE_STORE_Y = 500
 
