@@ -3,10 +3,12 @@ import win32gui, win32ui, win32con
 import numpy as np
 import cv2 as cv
 import core
-import default
 
 BROWSER_NO_SUPPORT = ["brave", "chrome", "firefox"]
-
+DEBUG_MODE = False
+THRESHOLD = .8
+DEFAULT_CV2_METHOD = cv.TM_CCOEFF_NORMED
+DEFAULT_CV2_BORDERCOLOR = (255, 0, 176)
 
 class Vision:
 
@@ -52,20 +54,27 @@ class Vision:
         self,
         needle,
         haystack,
-        threshold=0.8,
-        method=default.DEFAULT_CV2_METHOD,
+        threshold=THRESHOLD,
+        method=DEFAULT_CV2_METHOD,
     ):
         result = cv.matchTemplate(haystack, needle, method)
         _, max_val, _, max_loc = cv.minMaxLoc(result)
 
         if max_val >= threshold:
-            print("Found needle accuracy of: {}".format(max_val))
-            needle_w, needle_h = (needle.shape[0], needle.shape[1])
-            self.mark_target((needle_w, needle_h), max_loc, haystack)
-            self.show(haystack)
+            if DEBUG_MODE:
+                print("Found needle accuracy of: {}".format(max_val))
+                needle_w, needle_h = (needle.shape[0], needle.shape[1])
+                self.mark_target((needle_w, needle_h), max_loc, haystack)
+                self.show(haystack)
             return True
         else:
+            print("Failed to find needle with {} accuracy".format(max_val))
             return False
+        
+    def find_position(self, needle, haystack):
+        result = cv.matchTemplate(haystack, needle, DEFAULT_CV2_METHOD)
+        _, _, _, max_loc = cv.minMaxLoc(result)
+        return max_loc
 
     def show(self, screenshot):
         cv.imshow("Bot", screenshot)
@@ -73,7 +82,7 @@ class Vision:
     def mark_target(self, size, max_loc, screenshot):
         h, w = size
         x, y = max_loc
-        color = default.DEFAULT_CV2_BORDERCOLOR
+        color = DEFAULT_CV2_BORDERCOLOR
 
         top_left = (x, y)
         bottom_right = (x + w, y + h)
