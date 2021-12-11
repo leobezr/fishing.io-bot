@@ -22,6 +22,8 @@ HOOK_DURATION = .5
 class Player:
 
     player_name = None
+    basket_max_len = 6
+    
     height_offset = None
     window_w, window_h = pyautogui.size()
     
@@ -29,10 +31,12 @@ class Player:
     center_y = 0
 
     mov_status = PLAYER_STATUS_IDLE
+    _fishing_hook_pressed = "release"
 
-    def __init__(self, player_name, height_offset=300):
+    def __init__(self, player_name, basket_count=6, height_offset=300):
         self.player_name = player_name
         self.height_offset = height_offset
+        self.basket_max_len = basket_count
         self.center_x = round(self.window_w / 2)
         self.center_y = round(self.window_h / 2)
 
@@ -65,6 +69,17 @@ class Player:
         pyautogui.mouseDown()
         time.sleep(duration)
         pyautogui.mouseUp()
+        
+    def fishing_hook_click(self, pressed):                
+        if self._fishing_hook_pressed == pressed:
+            return
+        
+        self._fishing_hook_pressed = pressed
+        
+        if pressed == "press":
+            pyautogui.mouseDown()
+        elif pressed == "release":
+            pyautogui.mouseUp()
         
     def move(self, direction, duration=0.2):
         print("Character moving direction {}".format(direction))
