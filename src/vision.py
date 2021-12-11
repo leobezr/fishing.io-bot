@@ -74,7 +74,9 @@ class Vision:
 
             return True
         else:
-            print(f"Failed to find needle with {max_val} accuracy")
+            if DEBUG_MODE:
+                print(f"Failed to find needle with {max_val} accuracy")
+                
             return False
 
     def find_position(self, needle, haystack, threshhold=THRESHOLD):
