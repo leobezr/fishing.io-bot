@@ -22,7 +22,10 @@ HOOK_DURATION = .5
 class Player:
 
     player_name = None
+    
     basket_max_len = 6
+    total_fish_caught = 0
+    fish_in_basket = 0
     
     height_offset = None
     window_w, window_h = pyautogui.size()
@@ -39,6 +42,10 @@ class Player:
         self.basket_max_len = basket_count
         self.center_x = round(self.window_w / 2)
         self.center_y = round(self.window_h / 2)
+        
+    def get_is_basket_full(self):
+        return self.fish_in_basket >= self.basket_max_len
+        
 
     def change_status(self, status):
         if not status in STANDARD_STATUS:
@@ -64,11 +71,6 @@ class Player:
         pos_x = round(self.window_w / 2)
         pos_y = round(self.window_h / 2) + self.height_offset
         self.click_and_release(pos_x, pos_y)
-
-    def maintain_hook(self, duration=HOOK_DURATION):
-        pyautogui.mouseDown()
-        time.sleep(duration)
-        pyautogui.mouseUp()
         
     def fishing_hook_click(self, pressed):                
         if self._fishing_hook_pressed == pressed:
@@ -80,7 +82,14 @@ class Player:
             pyautogui.mouseDown()
         elif pressed == "release":
             pyautogui.mouseUp()
-        
+            
+    def add_fish_count(self):
+        self.fish_in_basket += 1
+        self.total_fish_caught += 1
+
+        print(f"Total fish caught: {self.total_fish_caught}")
+        print(f"Fish in basket: {self.fish_in_basket}")
+           
     def move(self, direction, duration=0.2):
         print("Character moving direction {}".format(direction))
         
