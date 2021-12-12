@@ -37,11 +37,12 @@ class Player:
     mov_status = PLAYER_STATUS_IDLE
     _fishing_hook_pressed = "release"
 
-    def __init__(self, player_name, basket_count=6, height_offset=300):
+    def __init__(self, player_name, fish_in_basket, basket_count=6, height_offset=300):
         self.player_name = player_name
         self.height_offset = height_offset
         self.basket_max_len = basket_count
         self._set_window_props()
+        self.fish_in_basket = fish_in_basket
         
     def _set_window_props(self):
         self.window_w, self.window_h = pyautogui.size()
@@ -55,6 +56,13 @@ class Player:
         
     def get_is_basket_full(self):
         return self.fish_in_basket >= self.basket_max_len
+    
+    def reload_game(self):
+        self.click_self()
+        
+        pyautogui.press("f5")
+        time.sleep(.8)
+        pyautogui.press("enter")
     
     def fish_sold(self):
         self.fish_in_basket = 0
@@ -103,14 +111,16 @@ class Player:
         elif pressed == "release":
             pyautogui.mouseUp()
             
+    def log_fish_count(self):
+        print(f"Total fish caught: {self.total_fish_caught}")
+        print(f"Total fish lost: {self.total_fish_lost}")
+        print(f"Fish in basket: {self.fish_in_basket}/{self.basket_max_len}")
+            
     def add_fish_count(self):
         self.fish_in_basket += 1
         self.total_fish_caught += 1
         self._fishing_hook_pressed = "release"
-
-        print(f"Total fish caught: {self.total_fish_caught}")
-        print(f"Total fish lost: {self.total_fish_lost}")
-        print(f"Fish in basket: {self.fish_in_basket}")
+        self.log_fish_count()
            
     def move(self, direction, duration=0.2):
         print("Character moving direction {}".format(direction))
