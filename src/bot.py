@@ -21,6 +21,9 @@ STORE_SELECT_ALL = cv.imread(r"./src/objects/select_all.jpg")
 STORE_SELL = cv.imread(r"./src/objects/sell_for.jpg")
 STORE_SELL_CONFIRM = cv.imread(r"./src/objects/sell_confirm.jpg")
 
+# GAME
+PLAYER_DISCONNECTED = cv.imread(r"./src/objects/player_disconnected.jpg")
+
 
 # DEFAULTS
 POS_LEAVE_STORE_X = 150
@@ -31,6 +34,7 @@ BOT_IDLE = "idle"
 
 DEBUG_MODE = False
 SAFE_TIMEOUT = 33
+DISCONNECT_WAIT = 33
 
 FISHING_BAR_HEIGHT = 200
 FISHING_BAR_WIDTH = 800
@@ -42,21 +46,69 @@ class Bot:
     player = None
     bot_in_action = False
     scene = None
+
     bot_got_stuck_timeout = time.time() + SAFE_TIMEOUT
+    bot_pending_reload = False
+
+    is_disconnected = False
+    disconnected_times = 0
+    disconnected_time_lock = 0
 
     _hook_bar_position = (0, 0)
     _hook_position_found = False
 
-    def __init__(self):
-        self.player = Player("BEZR Coder", basket_count=3)
+    def __init__(self, fish_in_basket=0, max_basket=6):
+        self.player = Player(
+            "BEZR Coder", basket_count=max_basket, fish_in_basket=fish_in_basket
+        )
+
         print("Bot setup ready")
 
     def run(self):
         self.refresh_scene()
         self.show_timeout_countdown()
+        self.check_if_disconnected()
 
-        if self.check_bot_action():
+        if self.is_bot_lock():
+            return
+        elif self.is_disconnected:
+            self.reloading_script()
+        elif self.check_bot_action():
             self.check_target_conditions()
+
+    def check_if_disconnected(self):
+        self.refresh_scene()
+
+        if self.is_bot_lock():
+            return
+
+        if vision.find(PLAYER_DISCONNECTED, self.scene):
+            print("~ Bot disconnected ~")
+
+            self.is_disconnected = True
+            self.disconnected_time_lock = time.time() + DISCONNECT_WAIT
+            self.player.reload_game()
+
+    def is_bot_lock(self):
+        return time.time() < self.disconnected_time_lock
+
+    def reloading_script(self):
+        self.refresh_scene()
+        
+        if vision.find(PLAYER_DISCONNECTED, self.scene):
+            return
+
+        self.refresh_timeout("Disconnected")
+        
+        self.player.click_self()
+        self.player.move("west", 6)
+        self.player.move("south", 2)
+        self.player.move("east", 2.3)
+        self.player.move("south", 4)
+        
+        self.in_action(BOT_IDLE)
+        self.disconnected_times += 1
+        self.is_disconnected = False
 
     def in_action(self, status=BOT_IN_ACTION):
         self.bot_in_action = status != BOT_IDLE
@@ -107,12 +159,23 @@ class Bot:
             self.auto_manage_hook()
 
     def show_timeout_countdown(self):
+        if self.is_disconnected:
+            bot_locked_remaining = int(self.disconnected_time_lock - time.time())
+            print(f"Bot disconnected, waiting reload {bot_locked_remaining}s")
+            print("--------------------------------------------------------------")
+            return
+
         timeout = int(self.bot_got_stuck_timeout - time.time())
 
         if timeout < 0:
             print("Bot timeout")
         else:
+            print(f"Playing as {self.player.player_name}")
+            print(f"Bot disconnected: {self.disconnected_times} times")
+            self.player.log_fish_count()
+            print("--------------------------------------------------------------")
             print(f"Next timeout: {timeout}")
+            print("--------------------------------------------------------------")
 
     def open_store(self):
         print("Opening store")
@@ -170,13 +233,13 @@ class Bot:
         self.refresh_scene()
 
         if vision.find(STORE_SELL, self.scene):
-            self.refresh_timeout("Selling all fish")
+            self.refresh_timeout("Clicking on sell button")
 
             x, y = vision.find_position(STORE_SELL, self.scene)
             self.player.click_and_release(x, y)
             self._shop_action_confirm_sell()
         else:
-            self._shop_action_sell()
+            self.sell_fish()
 
     def _shop_action_select_all(self):
         self.refresh_scene()
@@ -193,7 +256,7 @@ class Bot:
 
     def sell_fish(self):
         self.refresh_scene()
-        
+
         if vision.find(STORE_OPENED, self.scene):
             self.refresh_timeout("Player selling fish")
             self.player.change_status("selling")
@@ -205,14 +268,14 @@ class Bot:
     def _register_hook_pos(self):
         if self._hook_position_found:
             return
-        
+
         (x, y) = vision.find_position(HOOK, vision.orange_mask(self.scene))
 
         self._hook_bar_position = (
             x - round(FISHING_BAR_WIDTH / 2),
             y - FISHING_HOOK_OFFSET_Y,
         )
-        
+
         if self._hook_bar_position[0] > 0:
             self._hook_position_found = True
             print("Hook props set")
@@ -270,10 +333,10 @@ class Bot:
             waiting_time = 1.8
             print(f"Waiting sleep of {waiting_time} seconds")
             time.sleep(waiting_time)
-            
+
             self.refresh_scene()
             print("Met the condition hook not found")
-            
+
             if vision.find(FISH_TO_BASKET, vision.yellow_mask(self.scene)):
                 print("Trying to close basket")
                 self.refresh_timeout("Closing fish caught notification")
