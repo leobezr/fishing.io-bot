@@ -15,7 +15,7 @@ STANDARD_STATUS = (
     PLAYER_STATUS_PULLING,
 )
 
-CLICK_PRESS_DOWN_DURATION = 1
+CLICK_PRESS_DOWN_DURATION = .2
 HOOK_DURATION = .5
 
 
@@ -25,6 +25,7 @@ class Player:
     
     basket_max_len = 6
     total_fish_caught = 0
+    total_fish_lost = 0
     fish_in_basket = 0
     
     height_offset = None
@@ -40,12 +41,31 @@ class Player:
         self.player_name = player_name
         self.height_offset = height_offset
         self.basket_max_len = basket_count
+        self._set_window_props()
+        
+    def _set_window_props(self):
+        self.window_w, self.window_h = pyautogui.size()
         self.center_x = round(self.window_w / 2)
         self.center_y = round(self.window_h / 2)
         
+        print(self.window_w, self.window_h, self.center_x, self.center_y )
+        
+        if 0 >= self.center_x:
+            raise NameError("Window size error")
+        
     def get_is_basket_full(self):
         return self.fish_in_basket >= self.basket_max_len
+    
+    def fish_sold(self):
+        self.fish_in_basket = 0
+    
+    def log_fish_lost(self):
+        self.total_fish_lost += 1
+        self._fishing_hook_pressed = "release"
+        self.click_self()
         
+    def click_self(self, duration=.2):
+        pyautogui.click(self.center_x, self.center_y, 1, duration)
 
     def change_status(self, status):
         if not status in STANDARD_STATUS:
@@ -70,7 +90,7 @@ class Player:
 
         pos_x = round(self.window_w / 2)
         pos_y = round(self.window_h / 2) + self.height_offset
-        self.click_and_release(pos_x, pos_y)
+        self.click_and_release(pos_x, pos_y, 1.1)
         
     def fishing_hook_click(self, pressed):                
         if self._fishing_hook_pressed == pressed:
@@ -86,8 +106,10 @@ class Player:
     def add_fish_count(self):
         self.fish_in_basket += 1
         self.total_fish_caught += 1
+        self._fishing_hook_pressed = "release"
 
         print(f"Total fish caught: {self.total_fish_caught}")
+        print(f"Total fish lost: {self.total_fish_lost}")
         print(f"Fish in basket: {self.fish_in_basket}")
            
     def move(self, direction, duration=0.2):
