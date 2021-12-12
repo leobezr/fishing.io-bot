@@ -21,6 +21,9 @@ STORE_SELECT_ALL = cv.imread(r"./src/objects/select_all.jpg")
 STORE_SELL = cv.imread(r"./src/objects/sell_for.jpg")
 STORE_SELL_CONFIRM = cv.imread(r"./src/objects/sell_confirm.jpg")
 
+# GAME
+PLAYER_DISCONNECTED = cv.imread(r"./src/objects/player_disconnected.jpg")
+
 
 # DEFAULTS
 POS_LEAVE_STORE_X = 150
@@ -30,7 +33,8 @@ BOT_IN_ACTION = "action"
 BOT_IDLE = "idle"
 
 DEBUG_MODE = False
-SAFE_TIMEOUT = 23
+SAFE_TIMEOUT = 33
+DISCONNECT_WAIT = 33
 
 FISHING_BAR_HEIGHT = 200
 FISHING_BAR_WIDTH = 800
@@ -42,21 +46,69 @@ class Bot:
     player = None
     bot_in_action = False
     scene = None
+
     bot_got_stuck_timeout = time.time() + SAFE_TIMEOUT
+    bot_pending_reload = False
 
-    _hook_found = False
+    is_disconnected = False
+    disconnected_times = 0
+    disconnected_time_lock = 0
+
     _hook_bar_position = (0, 0)
+    _hook_position_found = False
 
-    def __init__(self):
-        self.player = Player("BEZR Coder")
+    def __init__(self, fish_in_basket=0, max_basket=6):
+        self.player = Player(
+            "BEZR Coder", basket_count=max_basket, fish_in_basket=fish_in_basket
+        )
+
         print("Bot setup ready")
 
     def run(self):
         self.refresh_scene()
         self.show_timeout_countdown()
+        self.check_if_disconnected()
 
-        if self.check_bot_action():
+        if self.is_bot_lock():
+            return
+        elif self.is_disconnected:
+            self.reloading_script()
+        elif self.check_bot_action():
             self.check_target_conditions()
+
+    def check_if_disconnected(self):
+        self.refresh_scene()
+
+        if self.is_bot_lock():
+            return
+
+        if vision.find(PLAYER_DISCONNECTED, self.scene):
+            print("~ Bot disconnected ~")
+
+            self.is_disconnected = True
+            self.disconnected_time_lock = time.time() + DISCONNECT_WAIT
+            self.player.reload_game()
+
+    def is_bot_lock(self):
+        return time.time() < self.disconnected_time_lock
+
+    def reloading_script(self):
+        self.refresh_scene()
+        
+        if vision.find(PLAYER_DISCONNECTED, self.scene):
+            return
+
+        self.refresh_timeout("Disconnected")
+        
+        self.player.click_self()
+        self.player.move("west", 6)
+        self.player.move("south", 2)
+        self.player.move("east", 2.3)
+        self.player.move("south", 4)
+        
+        self.in_action(BOT_IDLE)
+        self.disconnected_times += 1
+        self.is_disconnected = False
 
     def in_action(self, status=BOT_IN_ACTION):
         self.bot_in_action = status != BOT_IDLE
@@ -93,7 +145,6 @@ class Bot:
             self.start_fishing()
             return False
         elif action and status == "pulling":
-            self.find_hook_position()
             self.auto_manage_hook()
             return False
 
@@ -104,15 +155,27 @@ class Bot:
             self.move_to_store()
         elif vision.find(FISH_HOOKED, self.scene):
             self.player.click_and_release(self.player.center_x, self.player.center_y)
+            time.sleep(1)
             self.auto_manage_hook()
 
     def show_timeout_countdown(self):
+        if self.is_disconnected:
+            bot_locked_remaining = int(self.disconnected_time_lock - time.time())
+            print(f"Bot disconnected, waiting reload {bot_locked_remaining}s")
+            print("--------------------------------------------------------------")
+            return
+
         timeout = int(self.bot_got_stuck_timeout - time.time())
 
         if timeout < 0:
             print("Bot timeout")
         else:
+            print(f"Playing as {self.player.player_name}")
+            print(f"Bot disconnected: {self.disconnected_times} times")
+            self.player.log_fish_count()
+            print("--------------------------------------------------------------")
             print(f"Next timeout: {timeout}")
+            print("--------------------------------------------------------------")
 
     def open_store(self):
         print("Opening store")
@@ -124,22 +187,24 @@ class Bot:
             self.sell_fish()
         else:
             time.sleep(1)
-            self.open_store()
+            self.move_to_store()
 
     def move_to_store(self):
         self.refresh_timeout("Fish basket full, going to store")
         self.in_action(BOT_IN_ACTION)
         self.player.change_status("moving")
 
-        self.player.move("north", 3)
+        self.player.click_self()
+        self.player.move("north", 2)
         self.open_store()
 
     def move_back_fishing_point(self):
-        self.player.move("south", 3)
+        self.player.move("south", 4)
         self.player.change_status("idle")
         self.in_action(BOT_IDLE)
 
     def leave_shop(self):
+        self.player.fish_sold()
         self.refresh_scene()
 
         if vision.find(STORE_OPENED, self.scene):
@@ -149,8 +214,8 @@ class Bot:
 
             if vision.find(STORE_OPENED, self.scene):
                 self.leave_shop()
-            else:
-                self.move_back_fishing_point()
+        else:
+            self.move_back_fishing_point()
 
     def _shop_action_confirm_sell(self):
         self.refresh_scene()
@@ -168,13 +233,13 @@ class Bot:
         self.refresh_scene()
 
         if vision.find(STORE_SELL, self.scene):
-            self.refresh_timeout("Selling all fish")
+            self.refresh_timeout("Clicking on sell button")
 
             x, y = vision.find_position(STORE_SELL, self.scene)
             self.player.click_and_release(x, y)
             self._shop_action_confirm_sell()
         else:
-            self._shop_action_sell()
+            self.sell_fish()
 
     def _shop_action_select_all(self):
         self.refresh_scene()
@@ -190,41 +255,35 @@ class Bot:
             self._shop_action_select_all()
 
     def sell_fish(self):
+        self.refresh_scene()
+
         if vision.find(STORE_OPENED, self.scene):
             self.refresh_timeout("Player selling fish")
             self.player.change_status("selling")
             self._shop_action_select_all()
         else:
             time.sleep(1)
-            self.self_fish()
+            self.sell_fish()
 
     def _register_hook_pos(self):
-        (x, y) = vision.find_position(needle=HOOK, haystack=self.scene)
+        if self._hook_position_found:
+            return
+
+        (x, y) = vision.find_position(HOOK, vision.orange_mask(self.scene))
+
         self._hook_bar_position = (
             x - round(FISHING_BAR_WIDTH / 2),
             y - FISHING_HOOK_OFFSET_Y,
         )
-        print("Hook props set")
+
+        if self._hook_bar_position[0] > 0:
+            self._hook_position_found = True
+            print("Hook props set")
 
     def find_hook_position(self):
         self.refresh_scene()
 
-        if self._hook_found:
-            x, y = self._hook_bar_position
-
-            scene = vision.screenshot(
-                left=x,
-                top=y,
-                width=FISHING_BAR_WIDTH,
-                height=FISHING_BAR_HEIGHT,
-            )
-
-            return scene
-
-        self.refresh_timeout("Finding hook props")
-
-        if vision.find(needle=HOOK, haystack=self.scene):
-            self._hook_found = True
+        if vision.find(HOOK, vision.orange_mask(self.scene)):
             self._register_hook_pos()
 
     def _get_distance(self, hook, bar, bar_name):
@@ -239,59 +298,71 @@ class Bot:
             print(f"Bar {bar_name} is at the right from hook")
             self.player.fishing_hook_click("press")
 
+    def _debug_masks(self, needle, scene, name):
+        vision.find(needle, scene, show_window=True, silent=True)
+        vision.show(scene, name)
+
     def auto_manage_hook(self):
         self.in_action(BOT_IN_ACTION)
         self.player.change_status("pulling")
+        self.find_hook_position()
 
         x, y = self._hook_bar_position
-        scene = vision.screenshot(x, y, FISHING_BAR_WIDTH, FISHING_BAR_HEIGHT)
 
+        scene = vision.screenshot(x, y, FISHING_BAR_WIDTH, FISHING_BAR_HEIGHT)
         green_target = vision.green_mask(scene)
         red_target = vision.red_mask(scene)
 
-        green_x = vision.find_position(needle=STATUS_GREEN, haystack=green_target)[0]
-        red_x = vision.find_position(needle=STATUS_RED, haystack=red_target)[0]
-        hook_x = vision.find_position(needle=HOOK, haystack=scene)[0]
+        hook_x = vision.find_position(HOOK, vision.orange_mask(scene))[0]
+        green_x = vision.find_position(STATUS_GREEN, green_target)[0]
+        red_x = vision.find_position(STATUS_RED, red_target)[0]
 
         if DEBUG_MODE:
-            vision.find(
-                needle=STATUS_GREEN,
-                haystack=green_target,
-                show_window=True,
-                silent=True,
-            )
-            vision.find(
-                needle=STATUS_RED, haystack=red_target, show_window=True, silent=True
-            )
-            vision.find(needle=HOOK, haystack=scene, show_window=True, silent=True)
-
-            vision.show(green_target, "green view")
-            vision.show(red_target, "red view")
-            vision.show(scene)
+            self._debug_masks(STATUS_GREEN, green_target, "green view")
+            self._debug_masks(STATUS_RED, red_target, "red view")
+            self._debug_masks(HOOK, vision.orange_mask(scene), "Bot")
 
         if hook_x:
             self.refresh_timeout("Tracking hook")
-            
+
             if green_x:
                 self._get_distance(hook_x, green_x, "Green")
             elif red_x:
                 self._get_distance(hook_x, red_x, "Red")
-                
-        elif vision.find(FISH_TO_BASKET, self.scene):
-            self.add_fish_to_basket()
+        else:
+            waiting_time = 1.8
+            print(f"Waiting sleep of {waiting_time} seconds")
+            time.sleep(waiting_time)
+
+            self.refresh_scene()
+            print("Met the condition hook not found")
+
+            if vision.find(FISH_TO_BASKET, vision.yellow_mask(self.scene)):
+                print("Trying to close basket")
+                self.refresh_timeout("Closing fish caught notification")
+                self.add_fish_to_basket()
+            elif not vision.find(HOOK, vision.orange_mask(self.scene)):
+                print("Lost fish")
+                cv.destroyAllWindows()
+                self.in_action(BOT_IDLE)
+                self.player.log_fish_lost()
 
     def add_fish_to_basket(self):
         self.refresh_scene()
 
-        x, y = vision.find_position(FISH_TO_BASKET, self.scene)
-        w, h = FISH_TO_BASKET.size
-        
-        self.player.click_and_release(int(x + w/2), int(y + h/2))
+        x, y = vision.find_position(
+            FISH_TO_BASKET,
+            vision.yellow_mask(self.scene),
+            threshhold=0.7,
+        )
+        w, h = tuple(FISH_TO_BASKET.shape[1::-1])
+
+        self.player.click_and_release(int(x + w / 2), int(y + h / 2))
         time.sleep(1)
 
         self.refresh_scene()
-        
-        if vision.find(FISH_TO_BASKET, self.scene):
+
+        if vision.find(FISH_TO_BASKET, vision.yellow_mask(self.scene)):
             self.add_fish_to_basket()
         else:
             self.player.add_fish_count()
