@@ -18,8 +18,7 @@ def __main__():
 def start_game_loop():
     print("Starting game loop")
 
-    bot = Bot()
-    bot.refresh_timeout("Bot started")
+    bot = Bot(fish_in_basket=5, max_basket=8)
 
     while True:
         bot.run()
