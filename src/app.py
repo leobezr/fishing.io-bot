@@ -19,7 +19,6 @@ def start_game_loop():
     print("Starting game loop")
 
     bot = Bot()
-    bot.refresh_timeout("Bot started")
 
     while True:
         bot.run()
