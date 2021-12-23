@@ -9,10 +9,11 @@ vision = Vision("brave")
 
 # FISHING TARGETS
 HOOK = cv.imread(r"./src/objects/hook.jpg")
-FISH_HOOKED = cv.imread(r"./src/objects/warning.jpg")
-STATUS_GREEN = cv.imread(r"./src/objects/fishing_status_green.jpg")
-STATUS_RED = cv.imread(r"./src/objects/fishing_status_red.jpg")
+FISH_HOOKED = cv.imread(r"./src/objects/warning_mask.jpg")
+STATUS_GREEN = cv.imread(r"./src/objects/fishing_status_green_sm.jpg")
+STATUS_RED = cv.imread(r"./src/objects/fishing_status_red_sm.jpg")
 FISH_TO_BASKET = cv.imread(r"./src/objects/fish_caught_box.jpg")
+BASKET_FULL = cv.imread(r"./src/objects/basket_full.jpg")
 
 # STORE TARGETS
 STORE_OPENED = cv.imread(r"./src/objects/fish_store_logo.jpg")
@@ -153,7 +154,7 @@ class Bot:
     def check_target_conditions(self):
         if self.player.get_is_basket_full():
             self.move_to_store()
-        elif vision.find(FISH_HOOKED, self.scene):
+        elif vision.find(FISH_HOOKED, vision.warning_mask(self.scene)):
             self.player.click_and_release(self.player.center_x, self.player.center_y)
             time.sleep(1)
             self.auto_manage_hook()
@@ -374,3 +375,8 @@ class Bot:
         self.in_action(BOT_IN_ACTION)
 
         self.player.start_fishing()
+        time.sleep(.5)
+        
+        self.refresh_scene()
+        if vision.find(BASKET_FULL, vision.basket_mask(self.scene)):
+            self.move_to_store()
