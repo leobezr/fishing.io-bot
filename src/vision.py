@@ -119,6 +119,12 @@ class Vision:
 
     def yellow_mask(self, scene):
         return self.hsv(scene, 21, 156, 215, 40, 255, 255)
+    
+    def basket_mask(self, scene):
+        return self.hsv(scene, 0, 0, 201, 139, 255, 255)
+    
+    def warning_mask(self, screne):
+        return self.hsv(screne, 0, 213, 0, 32, 255, 255)
 
     def hsv(self, scene, h_min, s_min, v_min, h_max, s_max, v_max):
         lower = np.array([h_min, s_min, v_min])
