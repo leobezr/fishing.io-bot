@@ -2,11 +2,6 @@ from bot import Bot
 import cv2 as cv
 import time
 
-from vision import Vision
-
-vision = Vision("brave")
-
-
 def __main__():
     print("Script initiated")
     time.sleep(2)
@@ -18,7 +13,7 @@ def __main__():
 def start_game_loop():
     print("Starting game loop")
 
-    bot = Bot(fish_in_basket=5, max_basket=8)
+    bot = Bot(fish_in_basket=0, max_basket=11)
 
     while True:
         bot.run()
